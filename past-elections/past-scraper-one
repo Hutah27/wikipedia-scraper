@@ -1,0 +1,148 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
+from openpyxl.utils import get_column_letter
+import re
+
+page_names = []
+while True:
+    page_name = input("Enter a Wikipedia page name (or type 'done' to finish): ")
+    if page_name.lower() == 'done':
+        break
+    page_names.append(page_name.strip())
+
+for page_name in page_names:
+    # Construct the full Wikipedia URL for the current page
+    url = f"https://en.wikipedia.org/wiki/{page_name}"
+
+    # Send an HTTP GET request to the URL
+    response = requests.get(url)
+
+    # Check if the page exists
+    if response.status_code != 200:
+        print(f"\x1b[31mPage '{page_name}' does not exist. Skipping...\x1b[0m")
+        continue
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Initialize empty lists to store data
+    election_types = []
+    parties = []
+    candidates = []
+    votes = []
+    percentages = []
+    candidate_links = []  # To store candidate Wikipedia links
+    districts = []  # To store district numbers
+
+    # Base Wikipedia URL
+    base_wikipedia_url = "https://en.wikipedia.org"
+
+    # Find the election results tables
+    tables = soup.find_all('table', {'class': 'wikitable plainrowheaders'})
+
+    for table in tables:
+        caption = table.find('caption')
+        if caption:
+            current_election_type = re.sub(r'\[\d+\]', '', caption.get_text(strip=True))
+        else:
+            current_election_type = ""
+
+        # Extract the district number from the election name using regular expressions
+        district_match = re.search(r'(\d+)(st|nd|rd|th) congressional district', current_election_type, re.IGNORECASE)
+        if district_match:
+            district_number = district_match.group(1)
+        else:
+            district_number = ""
+
+        rows = table.find_all('tr')
+        for row in rows:
+            cells = row.find_all(['th', 'td'])  # Include <th> tags as well
+
+            if len(cells) == 5:
+                party = cells[1].find('a').text.strip() if cells[1].find('a') else cells[1].text.strip()
+                candidate = cells[2].text.strip()
+                candidate_link = base_wikipedia_url + cells[2].find('a')['href'] if cells[2].find('a') else ""
+                votes_str = cells[3].text.strip().replace(',', '')
+                percentage_str = cells[4].text.strip().replace('%', '')
+
+                election_types.append(current_election_type)
+                parties.append(party)
+                candidates.append(candidate)
+                votes.append(votes_str)
+                percentages.append(percentage_str)
+                candidate_links.append(candidate_link)
+                districts.append(district_number)
+
+    # Create a dictionary to store the extracted data
+    data = {
+        'Election Type': election_types,
+        'District': districts,  # Add the District column
+        'Party': parties,
+        'Candidate': candidates,
+        'Votes': votes,
+        'Percentages': percentages,
+        'Candidate Link': candidate_links,
+    }
+
+    # Create a DataFrame from the dictionary
+    df = pd.DataFrame(data)
+
+    # Create a new Excel file with openpyxl
+    wb = Workbook()
+    ws = wb.active
+
+    # Write the header row with formatting
+    header_format = Font(name='Calibri', bold=True, color="000000")  # Change color to black
+    header_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+    header_border = Border(left=Side(border_style="thin"), right=Side(border_style="thin"),
+                          top=Side(border_style="thin"), bottom=Side(border_style="thin"))
+    alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    for i, header in enumerate(df.columns, 1):
+        cell = ws.cell(row=1, column=i, value=header)
+        cell.font = header_format
+        cell.fill = header_fill
+        cell.border = header_border
+        cell.alignment = alignment
+
+    # Write the data with formatting
+    data_format = Font(name='Calibri', color="000000")
+    data_border = Border(left=Side(border_style="thin"), right=Side(border_style="thin"),
+                        top=Side(border_style="thin"), bottom=Side(border_style="thin"))
+
+    for row in df.iterrows():
+        values = row[1].tolist()
+        ws.append(values)
+        for cell in ws[ws.max_row]:
+            cell.font = data_format
+            cell.border = data_border
+            cell.alignment = alignment
+
+    # Set column widths
+    for i, column in enumerate(ws.columns, 1):
+        max_length = 0
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        column_letter = get_column_letter(i)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Save the Excel file with a name based on the current page name
+    output_file = f"{page_name}_election_results.xlsx"
+
+    # Save the Excel file
+    wb.save(output_file)
+
+    print(f"\x1b[32mData from '{page_name}' has been extracted and saved to '{output_file}'.\x1b[0m")
+
+# Thank the user and credit the author
+print("\n\x1b[37mThank you for using the Wikipedia scraper for past elections.\x1b[0m") 
+print("\x1b[37mAuthor: Gurwinder Singh\x1b[0m")  
+print("\x1b[37mVersion: 1.0\x1b[0m")  
+print("\x1b[37mFor any issues, please contact on Upwork: freelancers/~0162de9053b9e180f4\x1b[0m")
