@@ -26,7 +26,7 @@ If you haven't already, install the required Python libraries using pip:
 ### 3.2. Run the Script
 
 Download the script and execute it using Python:
-```python past-scraper-one.py```
+```python past-scraper-one.py``` or ```past-scraper-two.py```
 
 ### 3.3. Provide Wikipedia Page Names
 Follow the on-screen instructions to provide a list of Wikipedia page names (e.g., 2020 United States presidential election). Type 'done' in a new line when you've finished entering page names.
