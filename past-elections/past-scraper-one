@@ -1,4 +1,5 @@
 import requests
+import warnings  # Import the warnings module
 from bs4 import BeautifulSoup
 import pandas as pd
 from openpyxl import Workbook
@@ -6,12 +7,23 @@ from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
 from openpyxl.utils import get_column_letter
 import re
 
+# Disable DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 page_names = []
+processed_pages = []  # Maintain a list of processed page names
+
 while True:
     page_name = input("Enter a Wikipedia page name (or type 'done' to finish): ")
     if page_name.lower() == 'done':
         break
+
+    if page_name in processed_pages:
+        print(f"\x1b[31mRemoving '{page_name}' as duplicate\x1b[0m")
+        continue
+
     page_names.append(page_name.strip())
+    processed_pages.append(page_name)  # Add the page name to the processed list
 
 for page_name in page_names:
     # Construct the full Wikipedia URL for the current page
@@ -26,6 +38,13 @@ for page_name in page_names:
         continue
 
     soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Check if the page contains "election summary" or "election summaries" section
+    if (soup.find(text=re.compile(r'election summary', re.IGNORECASE)) or
+            soup.find(text=re.compile(r'election summaries', re.IGNORECASE)) or
+            soup.find('li', {'id': 'toc-Election_summaries'})):
+        print(f"\x1b[31mPlease use past-scraper-two.py to extract data from {page_name}.\x1b[0m")
+        continue
 
     # Initialize empty lists to store data
     election_types = []
@@ -142,7 +161,7 @@ for page_name in page_names:
     print(f"\x1b[32mData from '{page_name}' has been extracted and saved to '{output_file}'.\x1b[0m")
 
 # Thank the user and credit the author
-print("\n\x1b[37mThank you for using the Wikipedia scraper for past elections.\x1b[0m") 
-print("\x1b[37mAuthor: Gurwinder Singh\x1b[0m")  
-print("\x1b[37mVersion: 1.0\x1b[0m")  
-print("\x1b[37mFor any issues, please contact on Upwork: freelancers/~0162de9053b9e180f4\x1b[0m")
+print("\nThank you for using the Wikipedia scraper for past elections.") 
+print("Author: Gurwinder Singh")  
+print("Version: 1.0")  
+print("For any issues, please contact on Upwork: freelancers/~0162de9053b9e180f4")
